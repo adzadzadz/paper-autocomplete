@@ -1,7 +1,136 @@
-import {PolymerElement, html} from "../../@polymer/polymer-element.js";
-import "../../@polymer/paper-item/paper-item.js";
-import "../../@polymer/paper-ripple/paper-ripple.js";
-import "../../@polymer/paper-material/paper-material.js";
+/**
+  `paper-autocomplete-suggestions`
+
+  **From v3.x.x, this component only works with Polymer 1.7+ or 2.0+.**
+
+  [![Published on webcomponents.org](https://img.shields.io/badge/webcomponents.org-published-blue.svg)](https://www.webcomponents.org/element/ellipticaljs/paper-autocomplete)
+
+  [![Sauce Test Status](https://saucelabs.com/browser-matrix/jhuesos.svg)](https://saucelabs.com/u/jhuesos)
+
+  Allows to add autocomplete capabilities to any input field. This is desirable when you have an input field with custom
+  logic and you just want to add the feature to help users with the selection. If you want to use it in combination with
+  a regular `<paper-input>`, you can use `<paper-autocomplete>`.
+
+  Example:
+  ```
+  <div class="autocomplete-wrapper">
+    <paper-input id="myInput" label="Select State"></paper-input>
+
+    <paper-autocomplete-suggestions
+      for="myInput"
+      source="[[accounts]]"></paper-autocomplete-suggestions>
+  </div>
+  ```
+
+  It is **important to provide both `textProperty` and `valueProperty` when working with a custom search function and
+  or custom templates.** They are needed to keep the component accessible and for the events (e.g. onSelect) to keep
+  working.
+
+  ### About Polymer 1.x and 2.x Compatibility
+  From version `3.x.x`, this component work with both Polymer 1.7+ or Polymer 2.0+ Please take a look to the
+  [MIGRATION.md](./MIGRATION.md) file that contains more information.
+
+  ### Custom search
+  This component has the public method `queryFn` that is called in each key stroke and it is responsible to query
+  all items in the `source` and returns only those items that matches certain filtering criteria. By default, this
+  component search for items that start with the recent query (case insensitive).
+  You can override this behavior providing your own query function, as long as these two requirements are fulfill:
+
+  - The query function is synchronous.
+  - The API is respected and the method always return an Array.
+
+
+  The template use to render each suggestion depends on the structure of each object that this method returns. For the
+  default template, each suggestion should follow this object structure:
+
+  ```
+    {
+      text: objText,
+      value: objValue
+    }
+  ```
+
+  This function is only used when a local data source is used. When using a `remoteDataSource` user is responsible of
+  doing the search and specify suggestions manually.
+
+  ### Custom templates
+  A template for each suggestion can be provided, but for now, there are limitations in the way you can customize
+  the template. Please read the the following sections carefully.
+  In order to set your own template, you need to add a `<template>` tag with the slot name
+  `autocomplete-custom-template` and a structure equivalent to the one shown in the `<account-autocomplete>` component in
+  the demo.
+
+  You need to always maintain this structure. Then you can customize the content of paper-item. These are the reasons
+  why you need to maintain it:
+
+  - `onSelectHandler` it is very important because it will notify the `autocomplete` component when user selects one item.
+  If you don't add this option, when user clicks in one of the items, nothing will happen.
+  - `id`, `role` and `aria-selected` need to be there for accessibility reasons. If you don't set them, the component
+  will continue working but it will not be accessible for user with disabilities.
+
+
+  It is important to clarify that methods `_onSelect` and `_getSuggestionId` do not need to be implemented. They are
+  part of the logic of `paper-autocomplete-suggestions`.
+
+  When providing your own custom template, you might also need to provide your own custom search function. The reason
+  for that is that the default search function only exposes text and value in the results. If each item in your data
+  source contains more information, then you won't be able to access it. See the code of `<address-autocomplete>`
+  element in the demo folder for a complete example.
+
+  Another important thing to point out is related to the height of each suggestion item in the results. The height of
+  the suggestion template changes dynamically depending on the height of a suggestion item. However, the following
+  assumptions were made:
+  - All suggestions items have the same height
+  - The height of each item is fixed and can be determined at any time. For example, if you want to use images in the
+  results, make sure they have a placeholder or a fixed height.
+
+
+  ### Styling
+
+  `<paper-autocomplete-suggestions>` provides the following custom properties and mixins
+  for styling:
+
+  Custom property | Description | Default
+  ----------------|-------------|----------
+  `--paper-item-min-height` | paper item min height | `36px`
+  `--suggestions-wrapper` | mixin to apply to the suggestions container | `{}`
+  `--suggestions-item` | mixin to apply to the suggestions items | `{}`
+
+  ### Accessibility
+  This component exposes certain necessary values in order to make your component accessible. When checking the ARIA
+  specs, it is said that you need to inform users of the following changes:
+  - Whether the popup with suggestions is open or not.
+  - Id of the currently highlighted element
+
+ You can access these values using the following properties: `isOpen` and `highlightedSuggestion`. The id of each
+ element in highlightedSuggestion a random and unique id.
+
+ In addition, as long as developers follow the general structure of each suggestion template, the following A11Y
+ features are set in each suggestion:
+ - `role="option"`
+ - `aria-selected="true|false"`. This value will be false for all suggestion except in the one which is currently
+ highlighted.
+
+ By default, suggestions are only displayed after the user types, even if the current input should display them. If
+  you want to show suggestions on focus (when available), you should add the property `show-results-on-focus`.
+
+  @demo demo/paper-autocomplete-suggestions-demo.html
+*/
+/*
+  FIXME(polymer-modulizer): the above comments were extracted
+  from HTML and may be out of place here. Review them and
+  then delete this comment!
+*/
+import '../../@polymer/polymer/polymer-legacy.js';
+
+import '../../@polymer/paper-item/paper-item.js';
+import '../../@polymer/paper-ripple/paper-ripple.js';
+import '../../@polymer/paper-material/paper-material.js';
+import { Polymer } from '../../@polymer/polymer/lib/legacy/polymer-fn.js';
+import { html } from '../../@polymer/polymer/lib/utils/html-tag.js';
+import { Templatizer } from '../../@polymer/polymer/lib/legacy/templatizer-behavior.js';
+import { dom, flush } from '../../@polymer/polymer/lib/legacy/polymer.dom.js';
+import { PolymerElement } from '../../@polymer/polymer/polymer-element.js';
 
 var DIRECTION = {
   UP: 'up',
@@ -17,289 +146,283 @@ var KEY_CODES = {
   ESCAPE: 27
 };
 
-class PaperAutocompleteSuggestions extends PolymerElement {
-  static get properties() {
-    return {
-      /**
-       * Id of input
-       */
-      'for': {
-        type: String
-      },
-
-      /**
-       * `true` if the suggestions list is open, `false otherwise`
-       */
-      isOpen: {
-        type: Boolean,
-        value: false,
-        notify: true
-      },
-
-      /**
-       * Minimum length to trigger suggestions
-       */
-      minLength: {
-        type: Number,
-        value: 1
-      },
-
-      /**
-       * Max number of suggestions to be displayed without scrolling
-       */
-      maxViewableItems: {
-        type: Number,
-        value: 7
-      },
-
-      /**
-       * Property of local datasource to as the text property
-       */
-      textProperty: {
-        type: String,
-        value: 'text'
-      },
-
-      /**
-       * Property of local datasource to as the value property
-       */
-      valueProperty: {
-        type: String,
-        value: 'value'
-      },
-
-      /**
-       * `source` Array of objects with the options to execute the autocomplete feature
-       */
-      source: {
-        type: Array
-      },
-
-      /**
-       *  Object containing information about the current selected option. The structure of the object depends on the
-       *  structure of each element in the data source.
-       */
-      selectedOption: {
-        type: Object,
-        notify: true
-      },
-
-      /**
-       * Binds to a remote data source
-       */
-      remoteSource: {
-        type: Boolean,
-        value: false
-      },
-
-      /**
-       * Event type separator
-       */
-      eventNamespace: {
-        type: String,
-        value: '-'
-      },
-
-      /**
-       * Current highlighted suggestion. The structure of the object is:
-       * ```
-       * {
-       *    elementId: ID // id of the highlighted DOM element
-       *    option: // highlighted option data
-       * }
-       * ```
-       */
-      highlightedSuggestion: {
-        type: Object,
-        value: {},
-        notify: true
-      },
-
-      /**
-       * Function used to filter available items. This function is actually used by paper-autocomplete-suggestions,
-       * it is also exposed here so it is possible to provide a custom queryFn.
-       */
-       queryFn: {
-        type: Function
-      },
-
-      /**
-       * If `true`, it will always highlight the first result each time new suggestions are presented.
-       */
-      highlightFirst: {
-        type: Boolean,
-        value: false
-      },
-
-      /**
-       * Set to `true` to show available suggestions on focus. This overrides the default behavior that only shows
-       * notifications after user types
-       */
-      showResultsOnFocus: {
-        type: Boolean,
-        value: false
-      },
-
-      /**
-       * `_suggestions` Array with the actual suggestions to display
-       */
-      _suggestions: {
-        type: Array,
-        observer: '_onSuggestionsChanged'
-      },
-
-      /**
-       * Indicates the position in the suggestions popup of the currently highlighted element, being `0` the first one,
-       * and `this._suggestions.length - 1` the position of the last one.
-       */
-      _currentIndex: {
-        type: Number,
-        value: -1
-      },
-
-      /**
-       * Indicates the current position of the scroll. Then the `scrollTop` position is calculated multiplying the
-       * `_itemHeight` with the current index.
-       */
-      _scrollIndex: {
-        type: Number,
-        value: 0
-      },
-
-      /**
-       * Height of each suggestion element in pixels
-       */
-      _itemHeight: {
-        type: Number,
-        value: 36,
-        observer: '_itemHeightChanged'
-      },
-
-      _value: {
-        value: undefined
-      },
-
-      _text: {
-        value: undefined
-      },
-
-      /**
-       * This value is used as a base to generate unique individual ids that need to be added to each suggestion for
-       * accessibility reasons.
-       */
-      _idItemSeed: {
-        type: String,
-        value: 'aria-' + new Date().getTime() + '-' + (Math.floor(Math.random() * 1000)),
-        readOnly: true
-      },
-
-      /**
-       * Reference to binded functions so we can call removeEventListener on element detached
-       */
-      _bindedFunctions: {
-        type: Object,
-        value() {
-          return {
-            _onKeypress: null,
-            _onFocus: null,
-            _onBlur: null
-          };
-        }
-      },
-
-      /**
-       * Indicates if the the height of each suggestion item has been already calculated.
-       * The assumption is that item height is fixed and it will not change.
-       */
-      _hasItemHighBeenCalculated: {
-        type: Boolean,
-        value: false
-      },
-
-      /**
-       * To avoid unnecessary access to the DOM, we keep a reference to the current template being used
-       */
-      __customTplRef: Object
-    }
-  }
-
-  static get template() {
-    return html`
+Polymer({
+  _template: html`
     <style>
-    paper-material {
-      display: none;
-      position: absolute;
-      width: 100%;
-      z-index: 1000;
-      background-color: white;
-      max-height: 252px;
-      overflow-y: auto;
+      paper-material {
+        display: none;
+        position: absolute;
+        width: 100%;
+        z-index: 1000;
+        background-color: white;
+        max-height: 252px;
+        overflow-y: auto;
 
-      @apply --suggestions-wrapper;
-    }
+        @apply --suggestions-wrapper;
+      }
 
-    paper-item,
-    :host ::slotted(paper-item) {
-      min-height: var(--paper-item-min-height, 36px);
-      padding: 0 16px;
-      position: relative;
-      line-height: 18px;
+      paper-item,
+      :host ::slotted(paper-item) {
+        min-height: var(--paper-item-min-height, 36px);
+        padding: 0 16px;
+        position: relative;
+        line-height: 18px;
 
-      @apply --suggestions-item;
-    }
+        @apply --suggestions-item;
+      }
 
-    paper-item:hover,
-    :host ::slotted(paper-item:hover) {
-      background: #eee;
-      color: #333;
-      cursor: pointer;
-    }
+      paper-item:hover,
+      :host ::slotted(paper-item:hover) {
+        background: #eee;
+        color: #333;
+        cursor: pointer;
+      }
 
-    paper-item.active,
-    :host ::slotted(paper-item.active) {
-      background: #eee;
-      color: #333;
-    }
+      paper-item.active,
+      :host ::slotted(paper-item.active) {
+        background: #eee;
+        color: #333;
+      }
+
+      /**
+       * IE11 paper-item min-height bug: https://github.com/PolymerElements/paper-item/issues/35
+       */
+      @media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
+        paper-item {
+          height: var(--paper-item-min-height, 36px);
+        }
+      }
+    </style>
+    <div>
+      <!-- unselectable is needed to fix an issue related to the focus being taken away when clicking in the
+       results scrollbar -->
+      <paper-material elevation="1" id="suggestionsWrapper" unselectable="on"></paper-material>
+
+      <!-- Default suggestion template -->
+      <template id="defaultTemplate">
+        <paper-item id\$="[[_getSuggestionId(index)]]" role="option" aria-selected="false" on-tap="_onSelect">
+          <div>[[_getItemText(item)]]</div>
+          <paper-ripple></paper-ripple>
+        </paper-item>
+      </template>
+
+  <!-- Custom template -->
+  <slot id="templates" name="autocomplete-custom-template"></slot>
+  </div>
+`,
+
+  is: 'paper-autocomplete-suggestions',
+
+  behaviors: [
+    Templatizer
+  ],
+
+  properties: {
+    /**
+     * Id of input
+     */
+    'for': {
+      type: String
+    },
 
     /**
-     * IE11 paper-item min-height bug: https://github.com/PolymerElements/paper-item/issues/35
+     * `true` if the suggestions list is open, `false otherwise`
      */
-    @media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
-      paper-item {
-        height: var(--paper-item-min-height, 36px);
+    isOpen: {
+      type: Boolean,
+      value: false,
+      notify: true
+    },
+
+    /**
+     * Minimum length to trigger suggestions
+     */
+    minLength: {
+      type: Number,
+      value: 1
+    },
+
+    /**
+     * Max number of suggestions to be displayed without scrolling
+     */
+    maxViewableItems: {
+      type: Number,
+      value: 7
+    },
+
+    /**
+     * Property of local datasource to as the text property
+     */
+    textProperty: {
+      type: String,
+      value: 'text'
+    },
+
+    /**
+     * Property of local datasource to as the value property
+     */
+    valueProperty: {
+      type: String,
+      value: 'value'
+    },
+
+    /**
+     * `source` Array of objects with the options to execute the autocomplete feature
+     */
+    source: {
+      type: Array
+    },
+
+    /**
+     *  Object containing information about the current selected option. The structure of the object depends on the
+     *  structure of each element in the data source.
+     */
+    selectedOption: {
+      type: Object,
+      notify: true
+    },
+
+    /**
+     * Binds to a remote data source
+     */
+    remoteSource: {
+      type: Boolean,
+      value: false
+    },
+
+    /**
+     * Event type separator
+     */
+    eventNamespace: {
+      type: String,
+      value: '-'
+    },
+
+    /**
+     * Current highlighted suggestion. The structure of the object is:
+     * ```
+     * {
+     *    elementId: ID // id of the highlighted DOM element
+     *    option: // highlighted option data
+     * }
+     * ```
+     */
+    highlightedSuggestion: {
+      type: Object,
+      value: {},
+      notify: true
+    },
+
+    /**
+     * Function used to filter available items. This function is actually used by paper-autocomplete-suggestions,
+     * it is also exposed here so it is possible to provide a custom queryFn.
+     */
+     queryFn: {
+      type: Function
+    },
+
+    /**
+     * If `true`, it will always highlight the first result each time new suggestions are presented.
+     */
+    highlightFirst: {
+      type: Boolean,
+      value: false
+    },
+
+    /**
+     * Set to `true` to show available suggestions on focus. This overrides the default behavior that only shows
+     * notifications after user types
+     */
+    showResultsOnFocus: {
+      type: Boolean,
+      value: false
+    },
+
+    /**
+     * `_suggestions` Array with the actual suggestions to display
+     */
+    _suggestions: {
+      type: Array,
+      observer: '_onSuggestionsChanged'
+    },
+
+    /**
+     * Indicates the position in the suggestions popup of the currently highlighted element, being `0` the first one,
+     * and `this._suggestions.length - 1` the position of the last one.
+     */
+    _currentIndex: {
+      type: Number,
+      value: -1
+    },
+
+    /**
+     * Indicates the current position of the scroll. Then the `scrollTop` position is calculated multiplying the
+     * `_itemHeight` with the current index.
+     */
+    _scrollIndex: {
+      type: Number,
+      value: 0
+    },
+
+    /**
+     * Height of each suggestion element in pixels
+     */
+    _itemHeight: {
+      type: Number,
+      value: 36,
+      observer: '_itemHeightChanged'
+    },
+
+    _value: {
+      value: undefined
+    },
+
+    _text: {
+      value: undefined
+    },
+
+    /**
+     * This value is used as a base to generate unique individual ids that need to be added to each suggestion for
+     * accessibility reasons.
+     */
+    _idItemSeed: {
+      type: String,
+      value: 'aria-' + new Date().getTime() + '-' + (Math.floor(Math.random() * 1000)),
+      readOnly: true
+    },
+
+    /**
+     * Reference to binded functions so we can call removeEventListener on element detached
+     */
+    _bindedFunctions: {
+      type: Object,
+      value: function () {
+        return {
+          _onKeypress: null,
+          _onFocus: null,
+          _onBlur: null
+        };
       }
-    }
-  </style>
-  <div>
-    <!-- unselectable is needed to fix an issue related to the focus being taken away when clicking in the
-      results scrollbar -->
-    <paper-material elevation="1" id="suggestionsWrapper" unselectable="on"></paper-material>
+    },
 
-    <!-- Default suggestion template -->
-    <template id="defaultTemplate">
-      <paper-item id$="[[_getSuggestionId(index)]]" role="option" aria-selected="false" on-tap="_onSelect">
-        <div>[[_getItemText(item)]]</div>
-        <paper-ripple></paper-ripple>
-      </paper-item>
-    </template>
+    /**
+     * Indicates if the the height of each suggestion item has been already calculated.
+     * The assumption is that item height is fixed and it will not change.
+     */
+    _hasItemHighBeenCalculated: {
+      type: Boolean,
+      value: false
+    },
 
-<!-- Custom template -->
-<slot id="templates" name="autocomplete-custom-template"></slot>
-</div>
-    `;
-  }
+    /**
+     * To avoid unnecessary access to the DOM, we keep a reference to the current template being used
+     */
+    __customTplRef: Object
+  },
 
-  static get observer() {
-    return [
-      Polymer.Templatizer
-    ];
-  }
+  // Element Lifecycle
 
-  static get is() {
-    return 'paper-autocomplete-suggestions';
-  }
-
-  ready() {
+  ready: function () {
     this._value = this.value;
 
     // This is important to be able to access component methods inside the templates used with Templatizer
@@ -316,9 +439,9 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     // TODO: find a way to achieve this without modifying Polymer internal properties
     this._suggestionTemplate.__dataHost = this;
     this.templatize(this._suggestionTemplate);
-  }
+  },
 
-  attached() {
+  attached: function () {
     this._input = this.parentNode.querySelector('#' + this.for);
 
     if (this._input === null) {
@@ -332,9 +455,9 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this._input.addEventListener('keyup', this._bindedFunctions._onKeypress);
     this._input.addEventListener('focus', this._bindedFunctions._onFocus);
     this._input.addEventListener('blur', this._bindedFunctions._onBlur);
-  }
+  },
 
-  detached() {
+  detached: function () {
     this.cancelDebouncer('_onSuggestionChanged');
 
     this._input.removeEventListener('keyup', this._bindedFunctions._onKeypress);
@@ -343,7 +466,7 @@ class PaperAutocompleteSuggestions extends PolymerElement {
 
     this._input = null;
     this.__customTplRef = null;
-  }
+  },
 
   // Element Behavior
 
@@ -352,26 +475,26 @@ class PaperAutocompleteSuggestions extends PolymerElement {
    * @param {Object} suggestion The suggestion item
    * @return {String}
    */
-  _getItemText(suggestion) {
+  _getItemText: function (suggestion) {
     return suggestion[this.textProperty];
-  }
+  },
 
   /**
    * Show the suggestions wrapper
    */
-  _showSuggestionsWrapper() {
+  _showSuggestionsWrapper: function () {
     var suggestionsWrapper = this.$.suggestionsWrapper;
 
     suggestionsWrapper.style.display = 'block';
     suggestionsWrapper.setAttribute('role', 'listbox');
 
     this.isOpen = true;
-  }
+  },
 
   /**
    * Hide the suggestions wrapper
    */
-  _hideSuggestionsWrapper() {
+  _hideSuggestionsWrapper: function () {
     var suggestionsWrapper = this.$.suggestionsWrapper;
 
     suggestionsWrapper.style.display = 'none';
@@ -381,14 +504,14 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this.highlightedSuggestion = {};
 
     this._clearSuggestions();
-  }
+  },
 
-  _handleSuggestions(event) {
+  _handleSuggestions: function (event) {
     if (!this.remoteSource) this._createSuggestions(event);
     else this._remoteSuggestions();
-  }
+  },
 
-  _remoteSuggestions() {
+  _remoteSuggestions: function () {
     var value = this._input.value;
 
     var option = {
@@ -401,9 +524,9 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     } else {
       this._suggestions = [];
     }
-  }
+  },
 
-  _bindSuggestions(arr) {
+  _bindSuggestions: function (arr) {
     if (arr.length && arr.length > 0) {
       this._suggestions = arr;
       this._currentIndex = -1;
@@ -411,9 +534,9 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     } else {
       this._suggestions = [];
     }
-  }
+  },
 
-  _createSuggestions(event) {
+  _createSuggestions: function (event) {
     this._currentIndex = -1;
     this._scrollIndex = 0;
 
@@ -430,7 +553,7 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     } else {
       this._suggestions = [];
     }
-  }
+  },
 
   get _suggestionTemplate() {
     if (this.__customTplRef) {
@@ -440,16 +563,16 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this.__customTplRef = customTemplate.length > 0 ? customTemplate[0] : this.$.defaultTemplate;
 
     return this.__customTplRef;
-  }
+  },
 
   /**
    * Render suggestions in the suggestionsWrapper container
    * @param {Array} suggestions An array containing the suggestions to be rendered. This value is not optional, so
    *    in case no suggestions need to be rendered, you should either not call this method or provide an empty array.
    */
-  _renderSuggestions(suggestions) {
-    var suggestionsContainer = Polymer.dom(this.$.suggestionsWrapper);
-    var isPolymer1 = !Polymer.Element;
+  _renderSuggestions: function (suggestions) {
+    var suggestionsContainer = dom(this.$.suggestionsWrapper);
+    var isPolymer1 = !PolymerElement;
 
     this._clearSuggestions();
 
@@ -467,18 +590,18 @@ class PaperAutocompleteSuggestions extends PolymerElement {
       }
 
     }.bind(this));
-  }
+  },
 
-  _clearSuggestions() {
-    var suggestionsContainer = Polymer.dom(this.$.suggestionsWrapper),
+  _clearSuggestions: function () {
+    var suggestionsContainer = dom(this.$.suggestionsWrapper),
       last;
     while (last = suggestionsContainer.lastChild) suggestionsContainer.removeChild(last);
-  }
+  },
 
   /**
    * Listener to changes to _suggestions state
    */
-  _onSuggestionsChanged() {
+  _onSuggestionsChanged: function () {
     this.debounce('_onSuggestionChanged', function () {
       this._renderSuggestions(this._suggestions);
 
@@ -488,7 +611,7 @@ class PaperAutocompleteSuggestions extends PolymerElement {
         this._hideSuggestionsWrapper();
       }
 
-      Polymer.dom.flush();
+      flush();
 
       this._resetScroll();
 
@@ -507,9 +630,9 @@ class PaperAutocompleteSuggestions extends PolymerElement {
         this._moveHighlighted(DIRECTION.DOWN);
       }
     }, 100);
-  }
+  },
 
-  _selection(index) {
+  _selection: function (index) {
     var selectedOption = this._suggestions[index];
 
     this._input.value = selectedOption[this.textProperty];
@@ -522,43 +645,43 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this._fireEvent(selectedOption, 'selected');
 
     this.hideSuggestions();
-  }
+  },
 
   /**
    * Get all suggestion elements
    * @return {Array} a list of all suggestion elements
    */
-  _getItems() {
+  _getItems: function () {
     return this.$.suggestionsWrapper.querySelectorAll('paper-item');
-  }
+  },
 
   /**
    * Empty the list of current suggestions being displayed
    */
-  _emptyItems() {
+  _emptyItems: function () {
     this._suggestions = [];
-  }
+  },
 
-  _getId() {
+  _getId: function () {
     var id = this.getAttribute('id');
     if (!id) id = this.dataset.id;
     return id;
-  }
+  },
 
   /**
    * Remove the the active state from all suggestion items
    */
-  _removeActive(items) {
+  _removeActive: function (items) {
     [].slice.call(items).forEach(function (item) {
       item.classList.remove('active');
       item.setAttribute('aria-selected', 'false');
     });
-  }
+  },
 
   /**
    * Key press event handler
    */
-  _onKeypress(event) {
+  _onKeypress: function (event) {
     var keyCode = event.which || event.keyCode;
 
     switch (keyCode) {
@@ -582,23 +705,23 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     default:
       this._handleSuggestions(event);
     }
-  }
+  },
 
   /**
    * Event handler for the key ENTER press event
    */
-  _keyenter() {
+  _keyenter: function () {
     if (this.$.suggestionsWrapper.style.display === 'block' && this._currentIndex > -1) {
       var index = this._currentIndex;
       this._selection(index);
     }
-  }
+  },
 
   /**
    *  Move the current highlighted suggestion up or down
    *  @param {string} direction Possible values are DIRECTION.UP or DIRECTION.DOWN
    */
-  _moveHighlighted(direction) {
+  _moveHighlighted: function (direction) {
     var items = this._getItems();
 
     if (items.length === 0) {
@@ -631,13 +754,13 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this._setHighlightedSuggestion(highlightedOption, highlightedItem.id);
 
     this._scroll(direction);
-  }
+  },
 
   /**
    * Move scroll (if needed) to display the active element in the suggestions list.
    * @param {string} direction Direction to scroll. Possible values are `DIRECTION.UP` and `DIRECTION.DOWN`.
    */
-  _scroll(direction) {
+  _scroll: function (direction) {
     var newScrollValue, isSelectedOutOfView;
 
     var viewIndex = this._currentIndex - this._scrollIndex;
@@ -668,30 +791,30 @@ class PaperAutocompleteSuggestions extends PolymerElement {
       this._scrollIndex = newScrollValue;
       this.$.suggestionsWrapper.scrollTop = this._scrollIndex * this._itemHeight;
     }
-  }
+  },
 
   /**
    * Reset scroll back to zero
    */
-  _resetScroll() {
+  _resetScroll: function () {
     this.$.suggestionsWrapper.scrollTop = 0;
-  }
+  },
 
   /**
    * Set the current highlighted suggestion
    * @param {Object} option Data of the highlighted option
    * @param {string} elementId id of the highlighted dom element.
    */
-  _setHighlightedSuggestion(option, elementId) {
+  _setHighlightedSuggestion: function (option, elementId) {
     this.highlightedSuggestion = {
       option: option,
       elementId: elementId,
       textValue: option[this.textProperty],
       value: option[this.valueProperty]
     };
-  }
+  },
 
-  _fireEvent(option, evt) {
+  _fireEvent: function (option, evt) {
     var id = this._getId();
     var event = 'autocomplete' + this.eventNamespace + evt;
 
@@ -702,17 +825,17 @@ class PaperAutocompleteSuggestions extends PolymerElement {
       target: this,
       option: option
     });
-  }
+  },
 
-  _onSelect(event) {
+  _onSelect: function (event) {
     var index = this.modelForElement(event.currentTarget).index;
     this._selection(index);
-  }
+  },
 
   /**
    * Event handler for the onBlur event
    */
-  _onBlur() {
+  _onBlur: function () {
     var option = {
       text: this.text,
       value: this.value
@@ -721,12 +844,12 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     this._fireEvent(option, 'blur');
 
     this.hideSuggestions();
-  }
+  },
 
   /**
    * Event handler for the onFocus event
    */
-  _onFocus(event) {
+  _onFocus: function (event) {
     var option = {
       text: this.text,
       value: this.value
@@ -737,7 +860,7 @@ class PaperAutocompleteSuggestions extends PolymerElement {
     }
 
     this._fireEvent(option, 'focus');
-  }
+  },
 
   /**
    * Generate a suggestion id for a certain index
@@ -745,16 +868,16 @@ class PaperAutocompleteSuggestions extends PolymerElement {
    * @returns {string} a unique id based on the _idItemSeed and the position of that element in the suggestions popup
    * @private
    */
-  _getSuggestionId(index) {
+  _getSuggestionId: function (index) {
     return this._idItemSeed + '-' + index;
-  }
+  },
 
   /**
    * When item height is changed, the maxHeight of the suggestionWrapper need to be updated
    */
-  _itemHeightChanged() {
+  _itemHeightChanged: function () {
     this.$.suggestionsWrapper.style.maxHeight = this._itemHeight * this.maxViewableItems + 'px';
-  }
+  },
 
   /****************************
    * PUBLIC
@@ -764,18 +887,18 @@ class PaperAutocompleteSuggestions extends PolymerElement {
    * Sets the component's current suggestions
    * @param {Array} arr
    */
-  suggestions(arr) {
+  suggestions: function (arr) {
     this._bindSuggestions(arr);
-  }
+  },
 
   /**
    * Hides the suggestions popup
    */
-  hideSuggestions() {
+  hideSuggestions: function () {
     setTimeout(function () {
       this._hideSuggestionsWrapper();
     }.bind(this), 0);
-  }
+  },
 
   /**
    * Query function is called on each keystroke to query the data source and returns the suggestions that matches
@@ -784,7 +907,7 @@ class PaperAutocompleteSuggestions extends PolymerElement {
    * @param {string} query Current value in the input field
    * @returns {Array} an array containing only those items in the data source that matches the filtering logic.
    */
-  queryFn(datasource, query) {
+  queryFn: function (datasource, query) {
     var queryResult = [];
 
     datasource.forEach(function (item) {
@@ -860,6 +983,4 @@ class PaperAutocompleteSuggestions extends PolymerElement {
    * @param {Element} target
    * @param {Object} option
    */
-}
-    
-customElements.define(PaperAutocompleteSuggestions.is, PaperAutocompleteSuggestions);
+});

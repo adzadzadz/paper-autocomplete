@@ -1,21 +1,13 @@
-import {PolymerElement,html} from '../../@polymer/polymer-element.js';
-import "../../@polymer/iron-flex-layout/iron-flex-layout.js";
-import "../../@polymer/paper-input/paper-input.js";
-import "../../@polymer/paper-icon-button/paper-icon-button.js";
-import "../../@polymer/iron-icons/iron-icons.js";
+import {PolymerElement,html} from '@polymer/polymer/polymer-element.js';
+import "@polymer/iron-flex-layout/iron-flex-layout.js";
+import "@polymer/paper-input/paper-input.js";
+import "@polymer/paper-icon-button/paper-icon-button.js";
+import "@polymer/iron-icons/iron-icons.js";
 import "./paper-autocomplete-suggestions.js";
-import "../../@polymer/paper-item/paper-item.js";
-import "../../@polymer/paper-ripple/paper-ripple.js";
-import "../../@polymer/paper-material/paper-material.js";
+import "@polymer/paper-item/paper-item.js";
+import "@polymer/paper-ripple/paper-ripple.js";
+import "@polymer/paper-material/paper-material.js";
 
-/**
- * `LowerCaseDashedName` Description
- *
- * @customElement
- * @polymer
- * @demo
- * 
- */
 class PaperAutocomplete extends PolymerElement {
 
   static get template() {
@@ -328,7 +320,8 @@ class PaperAutocomplete extends PolymerElement {
          * it is also exposed here so it is possible to provide a custom queryFn.
          */
         queryFn: {
-          type        },
+          type: Function
+        },
 
         /**
          * If `true`, it will always highlight the first result each time new suggestions are presented.
@@ -412,6 +405,7 @@ class PaperAutocomplete extends PolymerElement {
 
   // Element Lifecycle
   ready() {
+    super.ready();
     this._value = this.value;
 
     this.addEventListener(
