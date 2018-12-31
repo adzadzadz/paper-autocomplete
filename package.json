@@ -2,7 +2,7 @@
   "name": "@adzadzadz/paper-autocomplete",
   "description": "Paper Autocomplete - Strepz Req",
   "homepage": "https://github.com/adzadzadz/paper-autocomplete",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "author": "Adrian T. Saycon <adzbite@gmail.com>",
   "dependencies": {
     "@polymer/iron-flex-layout": "^3.0.1",
