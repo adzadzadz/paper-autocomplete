@@ -443,9 +443,9 @@ class PaperAutocomplete extends PolymerElement {
    */
   _fireEvent(option, evt) {
     var id = this._getId();
-    var event = 'autocomplete' + this.eventNamespace + evt;
+    var event = new CustomEvent('autocomplete' + this.eventNamespace + evt);
 
-    this.fire(event, {
+    this.dispatchEvent(event, {
       id: id,
       value: option[this.valueProperty] || option.value,
       text: option[this.textProperty] || option.text,
